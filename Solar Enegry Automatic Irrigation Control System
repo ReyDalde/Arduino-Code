@@ -1,0 +1,344 @@
+
+//Solar Enegry Automatic Irrigation Control System
+//Version 1.0
+//Program by: Rey Sandoval Dalde
+//May 16, 2021
+
+
+#include <LiquidCrystal_I2C.h>
+
+LiquidCrystal_I2C lcd(0x27,20,4);  // set the LCD address to 0x27 for a 16 chars and 2 line display
+
+
+int SysNo1=7;
+int SysNo2=8;
+int SysNo3=9;
+int SysNo4=10;
+
+int StatusNo1=0;
+int StatusNo2=0;
+int StatusNo3=0;
+int StatusNo4=0;
+
+int readPinV = A0;
+int readPinLDR=A1;
+
+int V2 = 0;
+int VoltageRead=0;
+int LDR=1000;
+
+int ResetCtr=0;
+int VHighCtr=0;
+int VLowCtr=0;
+int VRHighCtr=0;
+int VRLowCtr=0;
+int HPwrCtr=0;
+int NormalCtr=0;
+int StatusNo1Ctr=0;
+int StatusNo2Ctr=0;
+int StatusNo3Ctr=0;
+int StatusNo4Ctr=0;
+
+
+int delayTime = 500;
+float VoltageReal=0.0;
+float VccRef;
+unsigned long int RunTimeCtr=0;
+int RTCtrHr=0;
+int RTCtrMin=0;
+int RTCtrSec=0;
+
+char VoltageStr[5];
+char LDRStr[5];
+char RTCStrHr[3];
+char RTCStrMin[3];
+char VCStr[3];
+char 
+
+void(* resetFunc) (void) = 0;
+
+
+long readVcc() {
+  long result;
+  // Read 1.1V reference against AVcc
+  ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
+  delay(100); // Wait for Vref to settle
+  ADCSRA |= _BV(ADSC); // Convert
+  while (bit_is_set(ADCSRA,ADSC));
+  result = ADCL;
+  result |= ADCH<<8;
+  result = 1125300L / result; // Back-calculate AVcc in mV
+  return result;
+}
+
+
+void setup() {
+
+
+  lcd.init();                      // initialize the lcd 
+  // Print a message to the LCD.
+  lcd.backlight();
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print("Bat=");
+
+  lcd.setCursor(11,0);
+  lcd.print("RT=000000");
+  
+  
+  lcd.setCursor(0,1);
+  lcd.print("Sys#1=");
+
+  lcd.setCursor(11,1);
+  lcd.print("Sys#2=");
+
+
+  lcd.setCursor(0,2);
+  lcd.print("Sys#3=");
+
+  lcd.setCursor(11,2);
+  lcd.print("Sys#4=");
+
+  lcd.setCursor(0,3);
+  lcd.print("Normal");
+   
+  pinMode(readPinV, INPUT);
+  pinMode(readPinLDR, INPUT);
+  
+  pinMode(SysNo1, OUTPUT);
+  pinMode(SysNo2, OUTPUT);
+  pinMode(SysNo3, OUTPUT);
+  pinMode(SysNo4, OUTPUT);
+
+  //Initialize Outputs
+
+  digitalWrite(SysNo1, HIGH); //Off
+  digitalWrite(SysNo2, HIGH); //Off
+  digitalWrite(SysNo3, HIGH); //Off
+  digitalWrite(SysNo4, HIGH); //Off
+
+  Serial.begin(9600);
+
+}
+
+void loop() {
+
+
+  RunTimeCtr++;
+  RTCtrSec++;
+  VoltageReal=0.00;
+  VoltageRead=0;
+
+  VccRef = readVcc()/1000.0;
+
+  delay(400);
+  
+  for( int j=0; j<50; j++) {
+    V2 = analogRead(readPinV);
+    VoltageRead=VoltageRead+V2;
+    delay(10);         
+  }
+
+  VoltageReal=(10.75*(((VoltageRead)/50.0+0.5)*VccRef)/1024.00);
+    
+//Display Battery Level
+ 
+  lcd.setCursor(0,0);
+  lcd.print("Bat=");
+  lcd.setCursor(4,0);
+  dtostrf(VoltageReal,5,1,VoltageStr);  
+  lcd.print(VoltageStr);
+  lcd.setCursor(9,0);
+  lcd.print("V ");
+
+//Display Run Time Hour & Minute
+
+ if (RTCtrSec>59) {
+     RTCtrMin++;
+     RTCtrSec=0;
+ }
+ if (RTCtrMin>59) {
+     RTCtrMin=0;
+     RTCtrHr++;
+ }
+
+  dtostrf(RTCtrHr,2,0,RTCStrHr);  
+  lcd.setCursor(14,0);
+  lcd.print(RTCStrHr);
+  lcd.setCursor(16,0);
+  lcd.print("H");  
+    
+  dtostrf(RTCtrMin,2,0,RTCStrMin);  
+  lcd.setCursor(17,0);
+  lcd.print(RTCStrMin);
+  lcd.setCursor(19,0);
+  lcd.print("m");  
+  
+// Check Relay Status
+
+  if (StatusNo1) {
+      digitalWrite(SysNo1, LOW);
+      lcd.setCursor(6,1);
+      lcd.print("ON ");
+      StatusNo1Ctr++;
+  }
+  else {
+      digitalWrite(SysNo1, HIGH);
+      lcd.setCursor(6,1);
+      lcd.print("OFF");    
+  }
+
+  if (StatusNo2) {
+      digitalWrite(SysNo2, LOW);
+      lcd.setCursor(17,1);
+      lcd.print("ON ");
+      StatusNo2Ctr++;
+  }
+  else {
+      digitalWrite(SysNo2, HIGH);
+      lcd.setCursor(17,1);
+      lcd.print("OFF");    
+  }
+
+  if (StatusNo3) {
+      digitalWrite(SysNo3, LOW);
+      lcd.setCursor(6,2);
+      lcd.print("ON ");
+      StatusNo3Ctr++;
+  }
+  else {
+      digitalWrite(SysNo3, HIGH);
+      lcd.setCursor(6,2);
+      lcd.print("OFF");    
+  }
+
+  if (StatusNo4) {
+      digitalWrite(SysNo4, LOW);
+      lcd.setCursor(17,2);
+      lcd.print("ON ");
+      StatusNo4Ctr++;
+      
+  }
+  else {
+      digitalWrite(SysNo4, HIGH);
+      lcd.setCursor(17,2);
+      lcd.print("OFF");    
+  }  
+
+  if (NormalCtr % 2 !=0) {
+
+
+    
+ 
+    
+  }
+
+
+  
+  if (VoltageReal>20.00) {
+    VoltageReal=0.00;
+    ResetCtr++;
+    if(ResetCtr % 2 != 0) {
+      lcd.setCursor(0,3);
+      lcd.print("Abnormal reading!!! ");
+    }  
+    else {
+      lcd.setCursor(0,3);
+      lcd.print("Check cables & power");    
+    }
+    if (ResetCtr>12) {
+      delay(5000);
+      resetFunc();
+    }
+  }
+
+
+  
+  else if (VoltageReal>14.00) {
+    VLowCtr=0;
+    ResetCtr=0;
+    NormalCtr=0;
+    lcd.setCursor(0,3);
+    if (VHighCtr %2 ==0) lcd.print("Voltage High        ");     
+    else {
+      lcd.print               ("                    ");
+      lcd.setCursor(0,3);
+      lcd.print("VHigh Ctr= ");
+      lcd.setCursor(10,3);
+      dtostrf(VHighCtr/1.0,2,0,VCStr);  
+      
+      lcd.print(VCStr);    
+    }
+
+    if(VHighCtr>59){ 
+        VHighCtr=0; 
+        if (!StatusNo1)StatusNo1=1;
+        else if (!StatusNo2)StatusNo2=1;
+        else if (!StatusNo3)StatusNo3=1;
+        else if (!StatusNo4){
+          HPwrCtr++;
+          if (HPwrCtr>7) {
+            HPwrCtr=0;
+            StatusNo4=1;
+          }
+        }        
+      }
+      else VHighCtr++;      
+  }
+  else if (VoltageReal<12.00 && VoltageReal>=10.50) {
+    VLowCtr++;
+    VHighCtr=0;
+    ResetCtr=0;
+    HPwrCtr=0;
+    NormalCtr=0;
+
+    lcd.setCursor(0,3);
+    
+    if(VLowCtr % 2 != 0) lcd.print("Voltage Low         "); 
+    else lcd.print                ("                    "); 
+    
+    if(VLowCtr>6){ 
+        VLowCtr=0;
+        VRLowCtr=0;
+        NormalCtr=0;
+        if (StatusNo4) StatusNo4=0;        //digitalWrite(SysNo1, LOW); 
+        else if (StatusNo3) StatusNo3=0;
+        else if (StatusNo2) StatusNo2=0;
+        else if (StatusNo1) StatusNo1=0;        
+    }    
+  }
+
+  else if (VoltageReal<10.50) {
+    VRLowCtr++;
+    VLowCtr++;
+    VHighCtr=0;
+    VRHighCtr=0;
+    ResetCtr=0;
+    HPwrCtr=0;
+    NormalCtr=0;
+    lcd.setCursor(0,3);
+    
+    lcd.print("Voltage Warning!!!  "); 
+    if (VRLowCtr>2) {
+      VRLowCtr=0;
+      VLowCtr=0;
+      NormalCtr=0;
+      if (StatusNo4) StatusNo4=0;        //digitalWrite(SysNo1, LOW); 
+      else if (StatusNo3) StatusNo3=0;
+      else if (StatusNo2) StatusNo2=0;
+      else if (StatusNo1) StatusNo1=0;        
+    }  
+        
+  }
+
+ 
+  else {
+    VHighCtr=0;
+    VLowCtr=0;
+    lcd.setCursor(0,3);
+    lcd.print("Normal             ");    
+    NormalCtr++;
+  } 
+   
+  //delay(delayTime);
+}
